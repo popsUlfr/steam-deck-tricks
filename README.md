@@ -4,6 +4,9 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 
 ## Contents
 
+- [Easy SSH access to the Steam Deck](#easy-ssh-access-to-the-steam-deck)
+  - [On the Steam Deck](#on-the-steam-deck)
+  - [On your computer](#on-your-computer)
 - [Disable powersave on wlan0 for snappier remote command](#disable-powersave-on-wlan0-for-snappier-remote-command)
 - [Add konsole (terminal) to Steam Deck UI](#add-konsole-terminal-to-steam-deck-ui)
 - [Encrypted Vaults with Plasma Vault and gocryptfs](#encrypted-vaults-with-plasma-vault-and-gocryptfs)
@@ -15,6 +18,68 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [auto-cpufreq](#auto-cpufreq)
 
 ---
+
+## Easy SSH access to the Steam Deck
+
+### On the Steam Deck
+
+In desktop mode, set a password for your user
+
+```sh
+passwd
+```
+
+Enable and start the ssh server
+
+```sh
+sudo systemctl enable --now sshd.service
+```
+
+Remember the ip address of the Steam Deck
+```sh
+ip addr
+```
+
+### On your computer
+
+Generate a new keypair
+```sh
+ssh-keygen -t ed25519 -f ~/.ssh/steamdeck_ed25519
+```
+(replace `<ip>` with the ip of the Steam Deck)
+
+Copy the public key over to the Steam Deck (will ask for the password of user deck)
+```sh
+ssh-copy-id -i ~/.ssh/steamdeck_ed25519.pub deck@<ip>
+```
+
+Create a configuration for the Steam Deck, create `~/.ssh/config` and add:
+```
+Host steamdeck
+  HostName <ip>
+  IdentityFile ~/.ssh/steamdeck_ed25519
+  User deck
+```
+
+Now you can simply connect with
+```sh
+ssh steamdeck
+```
+
+On the Steam Deck you can disable password authentication:
+
+Open `/etc/ssh/sshd_config` and find:
+```
+#PasswordAuthentication yes
+```
+and change to
+```
+PasswordAuthentication no
+```
+Reload sshd
+```sh
+sudo systemctl reload sshd.service
+```
 
 ## Disable powersave on wlan0 for snappier remote command
 
