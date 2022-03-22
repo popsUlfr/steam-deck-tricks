@@ -156,6 +156,7 @@ Another popular example is Discord:
 - `cp -a ~/.var/app/com.discordapp.Discord/config/discord ~/Vaults/main/`
 - `rm -rf ~/.var/app/com.discordapp.Discord/config/discord`
 - `ln -s ../../../../Vaults/main/discord ~/.var/app/com.discordapp.Discord/config/discord`
+- in **flatseal** add `~/Vaults/main/discord` under Filesystem > Other files
 
 ### Unlock Plasma Vaults from the Steam Deck UI
 
@@ -292,6 +293,11 @@ Add a sudoers rule to launch auto-cpufreq without password (`/etc/sudoers.d/zzz-
 ```sh
 echo "$USER ALL=(ALL) NOPASSWD:SETENV: $HOME/.local/bin/auto-cpufreq *" | sudo tee -a /etc/sudoers.d/zzz-auto-cpufreq
 chmod 0440 /etc/sudoers.d/zzz-auto-cpufreq
+```
+
+Reload the user daemon
+```sh
+systemctl --user daemon-reload
 ```
 
 You can enable auto-cpufreq to start on every boot:
