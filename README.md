@@ -12,6 +12,7 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [Shared keyboard, mouse and clipboard with barrier](#shared-keyboard-mouse-and-clipboard-with-barrier)
   - [On the main computer](#on-the-main-computer)
   - [On the Steam Deck](#on-the-steam-deck)
+- [auto-cpufreq](#auto-cpufreq)
 
 ---
 
@@ -19,7 +20,7 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 
 If ssh or barrier is lagging
 
-```
+```sh
 sudo iw dev wlan0 set power_save off
 ```
 
@@ -177,3 +178,63 @@ Install barrier from Discovery on the computer and the Steam Deck.
 ![](data/barrier-client.png)
 
 You should be good to go!
+
+## auto-cpufreq
+
+Automatically optimize cpu speed and power with auto-cpufreq: https://github.com/AdnanHodzic/auto-cpufreq
+
+It remains to be seen if it really helps or does something on the Steam Deck.
+
+The following steps will install auto-cpufreq into the home directory.
+
+<sub>(Build steps taken from the AUR PKGBUILD: https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=auto-cpufreq)</sub>
+
+```sh
+curl https://github.com/AdnanHodzic/auto-cpufreq/archive/refs/tags/v1.9.3.tar.gz | tar -xzf -
+cd auto-cpufreq-*
+mkdir -p "$HOME/.local"
+ln -s . "$HOME/.local/usr"
+python -m ensurepip --upgrade
+python -m pip install --upgrade pip
+python -m pip install distro
+sed -i 's|^\([^#].*\)/usr/\(local/\)\?|\1'"$HOME"'/.local/|g' auto_cpufreq/core.py
+python setup.py build
+python setup.py install --root="$HOME/.local" --optimize=1 --skip-build
+install -Dm755 scripts/cpufreqctl.sh -t "$HOME/.local/share/auto-cpufreq/scripts"
+```
+
+Add `export PATH="$PATH:$HOME/.local/bin"` to your `~/.bash_profile`.
+
+Create a systemd user service that will activate auto-cpufreq: `~/.config/systemd/user/auto-cpufreq.service`
+
+<sub>(`mkdir -p ~/.config/systemd/user ; vim ~/.config/systemd/user/auto-cpufreq.service`)</sub>
+```ini
+[Unit]
+Description=auto-cpufreq - Automatic CPU speed & power optimizer for Linux
+
+[Service]
+Type=simple
+ExecStart=sudo -E -n -- "%h/.local/bin/auto-cpufreq" --daemon
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+Make sure there's a `~/.config/environment.d/envvars.conf` with `PATH="$PATH:$HOME/.local/bin"` in it.
+
+Add a sudoers rule to launch auto-cpufreq without password (`/etc/sudoers.d/zzz-auto-cpufreq`)
+```sh
+echo "$USER ALL=(ALL) NOPASSWD:SETENV: $HOME/.local/bin/auto-cpufreq *" | sudo tee -a /etc/sudoers.d/zzz-auto-cpufreq
+chmod 0440 /etc/sudoers.d/zzz-auto-cpufreq
+```
+
+You can enable auto-cpufreq to start on every boot:
+```sh
+systemctl --user enable auto-cpufreq.service
+```
+
+You can monitor the stats:
+```sh
+auto-cpufreq --stats
+```
