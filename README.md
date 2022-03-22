@@ -2,6 +2,12 @@
 
 I'm compiling here Steam Deck quality of life improvements and tricks that will make working with it smoother.
 
+## Disable powersave on wlan0 for snappier remote command (ssh, barrier...)
+
+```
+sudo iw dev wlan0 set power_save off
+```
+
 ## Add konsole (terminal) to Steam Deck UI
 
 It can be practical to have konsole directly accessible from the Steam Deck UI
