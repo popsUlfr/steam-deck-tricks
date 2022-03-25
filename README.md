@@ -18,6 +18,9 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [auto-cpufreq](#auto-cpufreq)
   - [Low performance in games on battery](#low-performance-in-games-on-battery)
 - [Wireguard](#wireguard)
+- [Create a SteamOS/Arch development root in your home folder](#create-a-steamosarch-development-root-in-your-home-folder)
+- [Use your smartphone as webcam via Droidcam](#use-your-smartphone-as-webcam-via-droidcam)
+- [Android via Waydroid](#android-via-waydroid)
 
 ---
 
@@ -468,3 +471,198 @@ firejail --noprofile --netns=<wgconfname> firejail
 ```
 
 **I found a bug when using an ipv6 endpoint as soon as packets were sent, it would freeze the whole system and force a reboot after some time. Use an ipv4 endpoint for now. (last checked on kernel `5.13.0-valve10.3-1-neptune-02176-g5fe416c4acd8`)**
+
+
+## Create a SteamOS/Arch development root in your home folder
+
+To install software beyond flatpaks, AppImages like system packages it is practical to create a custom rootfs to build new software.
+
+The main rootfs already uses arch but it's not a good idea and doesn't work very well to use it to install missing system development tools and headers that are needed for building some packages.
+
+For this we'll be using two main tools and avoid using any root privileges at all: `fakeroot` and `bwrap` (bubblewrap).
+- `fakeroot` for faking root root privileges
+- `bwrap` for changing the rootfs and using a separate user namespace
+
+We fetch `fakeroot` and put it into our local folders:
+
+```sh
+mkdir -p ~/.local/bin
+sudo pacman --cachedir /tmp -Sw --noconfirm fakeroot
+tar -xf /tmp/fakeroot-*.pkg.tar.zst -C ~/.local --strip-components=1 usr/bin usr/lib
+sudo rm -f /tmp/fakeroot*.pkg.*
+```
+
+Make sure `export PATH="$PATH:$HOME/.local/bin"` is set in `~/.bash_profile` or set it for the session.
+
+We'll be using `~/.local/mnt/arch` as the dev rootfs but it can be anywhere.
+
+```sh
+export myroot="$HOME/.local/mnt/arch"
+mkdir -p "$myroot"
+```
+
+We set up the needed directories for pacman:
+
+```sh
+mkdir -m 0755 -p "$myroot"/var/{cache/pacman/pkg,lib/pacman,log} "$myroot"/{dev,run,etc/pacman.d,etc/pacman.d/gnupg}
+mkdir -m 1777 -p "$myroot"/tmp
+mkdir -m 0555 -p "$myroot"/{sys,proc}
+```
+
+Now we invoke `fakeroot` with the explicit `libfakeroot.so` library and `faked` binary locations and set up the keyrings (`"$myroot"/arch.fakeroot` will save the real file attributes):
+
+```sh
+fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
+	--faked "$HOME/.local/bin/faked" \
+	-i "$myroot"/arch.fakeroot -s "$myroot"/arch.fakeroot \
+	pacman-key --gpgdir "$myroot"/etc/pacman.d/gnupg --init
+fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
+	--faked "$HOME/.local/bin/faked" \
+	-i "$myroot"/arch.fakeroot -s "$myroot"/arch.fakeroot \
+	pacman-key --gpgdir "$myroot"/etc/pacman.d/gnupg --populate archlinux
+fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
+	--faked "$HOME/.local/bin/faked" \
+	-i "$myroot"/arch.fakeroot -s "$myroot"/arch.fakeroot \
+	pacman-key --gpgdir "$myroot"/etc/pacman.d/gnupg --populate holo
+```
+
+Install the `base` and `base-devel` groups:
+
+```sh
+fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
+	--faked "$HOME/.local/bin/faked" \
+	-i "$myroot"/arch.fakeroot -s "$myroot"/arch.fakeroot \
+	pacman --root "$myroot" --gpgdir "$myroot"/etc/pacman.d/gnupg -Sy --noconfirm base base-devel
+```
+
+Copy over `pacman.conf`, `mirrorlist` and `makepkg.conf`:
+
+```sh
+fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
+	--faked "$HOME/.local/bin/faked" \
+	-i "$myroot"/arch.fakeroot -s "$myroot"/arch.fakeroot \
+	cp -a /etc/pacman.conf "$myroot"/etc/pacman.conf
+fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
+	--faked "$HOME/.local/bin/faked" \
+	-i "$myroot"/arch.fakeroot -s "$myroot"/arch.fakeroot \
+	cp -a /etc/pacman.d/mirrorlist "$myroot"/etc/pacman.d/mirrorlist
+fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
+	--faked "$HOME/.local/bin/faked" \
+	-i "$myroot"/arch.fakeroot -s "$myroot"/arch.fakeroot \
+	cp -a /etc/makepkg.conf "$myroot"/etc/makepkg.conf
+```
+
+We can now enter the new root using bwrap, and we use the fakeroot from inside the root:
+
+```sh
+bwrap --bind "$myroot" / --dev /dev --proc /proc --ro-bind /sys /sys --tmpfs /tmp --unshare-all --share-net --ro-bind /etc/resolv.conf /etc/resolv.conf --clearenv fakeroot -i /arch.fakeroot -s /arch.fakeroot -- env HOME=/root USER=root bash
+```
+
+We are now inside the new root as the fake root user and first thing we need to set up the CA certificates otherwise we won't be able to download anything:
+
+```sh
+update-ca-trust
+```
+
+We set up an "unprivileged" user `deck` (the root user right now is already unprivileged) for using `makepkg`. `useradd` will fail to populate `/etc/passwd` and `/etc/shadow` so we'll to do it by hand:
+
+```sh
+useradd -m deck
+echo 'deck:x:1000:1000::/home/deck:/bin/bash` >> /etc/passwd
+echo 'deck:*:14871::::::' >> /etc/shadow
+```
+
+You can become this new user by:
+
+```sh
+su - deck
+```
+
+You can quit this environment at any time using `exit`.
+
+To enter again it is:
+
+```sh
+bwrap --bind "$myroot" / --dev /dev --proc /proc --ro-bind /sys /sys --tmpfs /tmp --unshare-all --share-net --ro-bind /etc/resolv.conf /etc/resolv.conf --clearenv fakeroot -i /arch.fakeroot -s /arch.fakeroot -- env HOME=/root USER=root bash
+```
+
+The development rootfs is now usable.
+
+## Use your smartphone as webcam via Droidcam
+
+You can use the camera of your smartphone as webcam using Droidcam if you don't have anything else on hand. Quite useful if on the go with only a steamdeck and a smartphone.
+
+- https://github.com/dev47apps/droidcam
+- https://play.google.com/store/apps/details?id=com.dev47apps.droidcam
+- https://play.google.com/store/apps/details?id=com.dev47apps.droidcamx
+
+**First follow [Create a SteamOS/Arch development root in your home folder](#create-a-steamosarch-development-root-in-your-home-folder) and set up a development ready rootfs.**
+
+Enter the development root:
+```sh
+bwrap --bind "$myroot" / --dev /dev --proc /proc --ro-bind /sys /sys --tmpfs /tmp --unshare-all --share-net --ro-bind /etc/resolv.conf /etc/resolv.conf --clearenv fakeroot -i /arch.fakeroot -s /arch.fakeroot -- env HOME=/root USER=root bash
+```
+
+Install git and clone droidcam from the AUR:
+```sh
+pacman -Sy --noconfirm --needed git
+su - deck -c 'git clone https://aur.archlinux.org/droidcam.git /home/deck/droidcam'
+```
+
+We'll install the build dependencies manually since `sudo` won't work in this environment (setting a password manually in `/etc/shadow` might work by using `su` as fallback):
+
+```sh
+sed -n 's/makedepends=(\([^)]\+\))/\1/p' /home/deck/droidcam/PKGBUILD | xargs pacman -Sy --noconfirm --asdeps
+```
+
+Build the `droidcam` packages as `deck` user using `makepkg`:
+
+```sh
+su - deck -c 'cd /home/deck/droidcam ; makepkg'
+```
+
+You can exit the dev environment now with `exit`.
+
+On the real system we'll make the rootfs read-write, set up the keyrings, install the kernel headers, runtime dependencies and finally install our newly built packages:
+```sh
+sudo steamos-readonly disable
+sudo pacman-key --init
+sudo pacman-key --populate archlinux
+sudo pacman-key --populate holo
+sudo pacman -Sy --noconfirm --needed linux-neptune-headers libappindicator-gtk3
+sudo pacman -U --noconfirm "$myroot"/home/deck/droidcam/*.pkg.tar.zst
+sudo steamos-readonly enable
+```
+
+Load the needed kernel modules into memory:
+```sh
+xargs -a /etc/modules-load.d/droidcam.conf -n 1 sudo modprobe
+```
+
+Start `droidcam` from your applications or terminal:
+
+![](data/droidcam-client.png)
+
+On your smartphone install either [Droidcam](https://play.google.com/store/apps/details?id=com.dev47apps.droidcam) or [DroidcamX](https://play.google.com/store/apps/details?id=com.dev47apps.droidcamx)
+
+![](data/droidcam-smartphone.png)
+
+Enter the ip address shown on the smartphone in the Droidcam client on the Steam Deck and connect. The webcam is now ready.
+
+Each update of SteamOS will reset the droidcam install but you can reinstall it quickly by doing:
+
+```sh
+sudo steamos-readonly disable
+sudo pacman-key --init
+sudo pacman-key --populate archlinux
+sudo pacman-key --populate holo
+sudo pacman -Sy --noconfirm --needed linux-neptune-headers libappindicator-gtk3
+sudo pacman -U --noconfirm "$myroot"/home/deck/droidcam/*.pkg.tar.zst
+sudo steamos-readonly enable
+```
+
+## Android via Waydroid
+
+- https://wiki.archlinux.org/title/Waydroid
+
+**TODO**
