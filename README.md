@@ -612,7 +612,7 @@ su - deck -c 'git clone https://aur.archlinux.org/droidcam.git /home/deck/droidc
 We'll install the build dependencies manually since `sudo` won't work in this environment (setting a password manually in `/etc/shadow` might work by using `su` as fallback):
 
 ```sh
-sed -n 's/makedepends=(\([^)]\+\))/\1/p' /home/deck/droidcam/PKGBUILD | xargs pacman -Sy --noconfirm --asdeps
+sed -n 's/makedepends=(\([^)]\+\))/\1/p' /home/deck/droidcam/PKGBUILD | xargs -n 1 pacman -S --noconfirm --asdeps --needed
 ```
 
 Build the `droidcam` packages as `deck` user using `makepkg`:
@@ -663,6 +663,126 @@ sudo steamos-readonly enable
 
 ## Android via Waydroid
 
-- https://wiki.archlinux.org/title/Waydroid
+Launching Android apps is possible using [Waydroid](https://wiki.archlinux.org/title/Waydroid).
 
-**TODO**
+Here's a guide on how to get it up and running on the Steam Deck.
+
+**First follow [Create a SteamOS/Arch development root in your home folder](#create-a-steamosarch-development-root-in-your-home-folder) and set up a development ready rootfs.**
+
+Enter the development root:
+```sh
+bwrap --bind "$myroot" / --dev /dev --proc /proc --ro-bind /sys /sys --tmpfs /tmp --unshare-all --share-net --ro-bind /etc/resolv.conf /etc/resolv.conf --clearenv fakeroot -i /arch.fakeroot -s /arch.fakeroot -- env HOME=/root USER=root bash
+```
+
+Install git and clone anbox-modules-git, waydroid and all their dependencies from the AUR:
+```sh
+pacman -Sy --noconfirm --asdeps --needed git dkms linux-neptune-headers
+su - deck -c 'git clone https://aur.archlinux.org/anbox-modules-dkms-git.git /home/deck/anbox-modules-dkms-git'
+# Patch PKGBUILD to comment out a sed that makes it fail to compile on the valve kernel
+sed -i 's/\b\(sed\s\+.*#if\s\+1.*binder\.c\s*\)$/#\1/' /home/deck/anbox-modules-dkms-git/PKGBUILD
+sed -n 's/\b\(make\)\?depends=(\([^)]\+\))/\2/p' /home/deck/anbox-modules-dkms-git/PKGBUILD | xargs -n 1 pacman -S --noconfirm --asdeps --needed
+su - deck -c 'cd /home/deck/anbox-modules-dkms-git ; makepkg'
+su - deck -c 'git clone https://aur.archlinux.org/libglibutil.git /home/deck/libglibutil'
+sed -n 's/\b\(make\)\?depends=(\([^)]\+\))/\2/p' /home/deck/libglibutil/PKGBUILD | xargs -n 1 pacman -S --noconfirm --asdeps --needed
+su - deck -c 'cd /home/deck/libglibutil ; makepkg'
+pacman -U --noconfirm --needed --asdeps /home/deck/libglibutil/*.pkg.tar.zst
+su - deck -c 'git clone https://aur.archlinux.org/libgbinder.git /home/deck/libgbinder'
+sed -n 's/\b\(make\)\?depends=(\([^)]\+\))/\2/p' /home/deck/libgbinder/PKGBUILD | xargs -n 1 pacman -S --noconfirm --asdeps --needed
+su - deck -c 'cd /home/deck/libgbinder ; makepkg'
+pacman -U --noconfirm --needed --asdeps /home/deck/libgbinder/*.pkg.tar.zst
+su - deck -c 'git clone https://aur.archlinux.org/python-gbinder.git /home/deck/python-gbinder'
+sed -n 's/\b\(make\)\?depends=(\([^)]\+\))/\2/p' /home/deck/python-gbinder/PKGBUILD | xargs -n 1 pacman -S --noconfirm --asdeps --needed
+su - deck -c 'cd /home/deck/python-gbinder ; makepkg'
+pacman -U --noconfirm --needed --asdeps /home/deck/python-gbinder/*.pkg.tar.zst
+su - deck -c 'git clone https://aur.archlinux.org/waydroid.git /home/deck/waydroid'
+sed -n 's/\b\(make\)\?depends=(\([^)]\+\))/\2/p' /home/deck/waydroid/PKGBUILD | xargs -n 1 pacman -S --noconfirm --asdeps --needed
+su - deck -c 'cd /home/deck/waydroid ; makepkg'
+su - deck -c 'git clone https://aur.archlinux.org/python-pyclip.git /home/deck/python-pyclip'
+sed -n 's/\b\(make\)\?depends=(\([^)]\+\))/\2/p' /home/deck/python-pyclip/PKGBUILD | xargs -n 1 pacman -S --noconfirm --asdeps --needed
+su - deck -c 'cd /home/deck/python-pyclip ; makepkg'
+mv /home/deck/libglibutil/*.pkg.tar.zst /home/deck/libgbinder/*.pkg.tar.zst /home/deck/python-gbinder/*.pkg.tar.zst /home/deck/python-pyclip/*.pkg.tar.zst /home/deck/waydroid/
+```
+
+Exit the dev environment with `exit`.
+
+In the real rootfs install the anbox modules:
+```sh
+sudo steamos-readonly disable
+sudo pacman-key --init
+sudo pacman-key --populate archlinux
+sudo pacman-key --populate holo
+sudo pacman -Sy --noconfirm --needed linux-neptune-headers libappindicator-gtk3
+sudo pacman -U --noconfirm "$myroot"/home/deck/anbox-modules-dkms-git/*.pkg.tar.zst
+sudo pacman -U --noconfirm --asdeps "$myroot"/home/deck/waydroid/*.pkg.tar.zst
+sudo pacman -D --asexplicit waydroid
+sudo pacman -S --needed --noconfirm weston
+sudo steamos-readonly enable
+```
+
+Load the modules:
+```sh
+xargs -a /usr/lib/modules-load.d/anbox.conf -n 1 sudo modprobe
+```
+
+Offload the waydroid folder onto the home partition:
+```sh
+sudo cp -a /usr/lib/systemd/system/var-lib-docker.mount /etc/systemd/system/var-lib-waydroid.mount
+sudo sed -i 's|/var/lib/docker|/var/lib/waydroid|g' /etc/systemd/system/var-lib-waydroid.mount
+sudo systemctl daemon-reload
+sudo systemctl enable --now var-lib-waydroid.mount
+```
+
+It may be needed to add `psi=1` to the kernel command line (needs more testing)
+```sh
+sudo mount /dev/disk/by-partsets/self/efi /mnt
+sudo sed -i 's/\b\(steamenv_boot\s\+.*\)$/\1 psi=1/g' /mnt/EFI/steamos/grub.cfg
+sudo umount /mnt
+```
+Reboot.
+
+Initialize waydroid by downloading the latest image:
+```sh
+sudo waydroid init -s GAPPS -f
+```
+
+Start the service:
+```sh
+sudo systemctl start waydroid-container.service
+```
+
+Make waydroid folder writable for everyone:
+```sh
+sudo chmod g+w,o+w /var/lib/waydroid
+```
+
+You'll need to disable hardware acceleration for it to work currently. Edit `/var/lib/waydroid/waydroid_base.prop`:
+```ini
+ro.hardware.gralloc=default
+ro.hardware.egl=swiftshader
+```
+
+Launch `weston`, it will offer a little sandboxed wayland envrironment.
+
+Open a terminal by clicking on the terminal icon in the upper left corner and set the XDG session:
+
+```sh
+export XDG_SESSION_TYPE=wayland
+```
+
+Launch the waydroid session and wait until you get `Android with user 0 is ready`:
+```sh
+waydroid session start
+```
+
+![](data/waydroid-session.png)
+
+In another terminal in `weston` launch:
+```sh
+waydroid show-full-ui
+```
+
+![](data/waydroid-show-full-ui.png)
+
+At this point you should see the android home screen.
+
+![](data/waydroid-android.png)
