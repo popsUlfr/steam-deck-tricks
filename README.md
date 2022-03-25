@@ -16,6 +16,7 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
   - [On the main computer](#on-the-main-computer)
   - [On the Steam Deck](#on-the-steam-deck)
 - [auto-cpufreq](#auto-cpufreq)
+  - [Low performance in games on battery](#low-performance-in-games-on-battery)
 - [Wireguard](#wireguard)
 
 ---
@@ -293,7 +294,7 @@ Make sure there's a `~/.config/environment.d/envvars.conf` with `PATH="$PATH:$HO
 Add a sudoers rule to launch auto-cpufreq without password (`/etc/sudoers.d/zzz-auto-cpufreq`)
 ```sh
 echo "$USER ALL=(ALL) NOPASSWD:SETENV: $HOME/.local/bin/auto-cpufreq *" | sudo tee -a /etc/sudoers.d/zzz-auto-cpufreq
-chmod 0440 /etc/sudoers.d/zzz-auto-cpufreq
+sudo chmod 0440 /etc/sudoers.d/zzz-auto-cpufreq
 ```
 
 Reload the user daemon
@@ -303,12 +304,52 @@ systemctl --user daemon-reload
 
 You can enable auto-cpufreq to start on every boot:
 ```sh
-systemctl --user enable auto-cpufreq.service
+systemctl --user enable --now auto-cpufreq.service
 ```
 
 You can monitor the stats:
 ```sh
 auto-cpufreq --stats
+```
+
+### Low performance in games on battery
+
+By default when the device is not charging auto-cpufreq will switch to the `powersave` cpu governor which might affect games' performance.
+
+You can force it to use the default `schedutil` for both charging and on battery.
+
+Create `~/.config/auto-cpufreq.conf`:
+
+```ini
+[charger]
+governor = schedutil
+
+[battery]
+governor = schedutil
+```
+
+Change the service file `~/.config/systemd/user/auto-cpufreq.service`:
+```ini
+[Unit]
+Description=auto-cpufreq - Automatic CPU speed & power optimizer for Linux
+
+[Service]
+Type=simple
+ExecStart=sudo -E -n -- "%h/.local/bin/auto-cpufreq" --daemon --config "%h/.config/auto-cpufreq.conf"
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+Reload user daemon
+```sh
+systemctl --user daemon-reload
+```
+
+Restart the service
+```sh
+systemctl --user restart auto-cpufreq.service
 ```
 
 ## Wireguard
