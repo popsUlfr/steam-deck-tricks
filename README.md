@@ -16,6 +16,7 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
   - [On the main computer](#on-the-main-computer)
   - [On the Steam Deck](#on-the-steam-deck)
 - [auto-cpufreq](#auto-cpufreq)
+- [Wireguard](#wireguard)
 
 ---
 
@@ -309,3 +310,120 @@ You can monitor the stats:
 ```sh
 auto-cpufreq --stats
 ```
+
+## Wireguard
+
+You can install the wireguard tools locally like this:
+
+```sh
+sudo pacman --cachedir /tmp -Sw --noconfirm wireguard-tools
+mkdir -p ~/.local/bin
+tar -xf /tmp/wireguard-tools-*.pkg.tar.zst -C ~/.local/bin --strip-components=2 usr/bin
+sudo rm -f /tmp/wireguard-tools*.pkg.*
+```
+
+Make sure there is a `export PATH="$PATH:$HOME/.local/bin"` in your `~/.bash_profile`.
+
+You can create `/etc/wireguard` and copy you wireguard configs there.
+
+```sh
+wg-quick up <wgconf>
+```
+
+Network Manager also has wireguard support.
+
+Helper script for creating a separate network namespace for your applications with a wireguard connection.
+
+Save it as `~/.local/bin/wg-netns` and make it executable.
+
+<sub>(`vim ~/.local/bin/wg-netns ; chmod +x ~/.local/bin/wg-netns`)</sub>
+
+```bash
+#!/usr/bin/env bash
+IFS=$'\n'
+set -euo pipefail
+set -x
+
+export WG_ENDPOINT_RESOLUTION_RETRIES=infinity
+
+WGCONF="$(sudo -u "${SUDO_USER:-${USER}}" -- cat "$2")"
+WGDEV="$(basename "$2" .conf)"
+WGPK="/tmp/$WGDEV-pk"
+
+val_parse() {
+	sed -n 's/^'"$1"'\s*=\s*\(\S\+\)\s*$/\1/p' <<<"$WGCONF"
+}
+arr_parse() {
+	sed -n 's/^'"$1"'\s*=\s*\(\S.*\S\)\s*$/\1/p' <<<"$WGCONF" | sed 's/\s*,\s*/\n/g'
+}
+
+PrivateKey="$(val_parse PrivateKey)"
+ListenPort="$(val_parse ListenPort)"
+FwMark="$(val_parse FwMark)"
+PublicKey="$(val_parse PublicKey)"
+PresharedKey="$(val_parse PresharedKey)"
+AllowedIPs=($(arr_parse AllowedIPs))
+Endpoint="$(val_parse Endpoint)"
+PersistentKeepalive="$(val_parse PersistentKeepalive)"
+Addresses=($(arr_parse Address))
+DNS=($(arr_parse DNS))
+MTU="$(val_parse MTU)"
+
+wg_set_opts=()
+[[ -n "$ListenPort" ]] && wg_set_opts+=(listen-port "$ListenPort")
+[[ -n "$FwMark" ]] && wg_set_opts+=(fwmark "$FwMark")
+[[ -n "$PrivateKey" ]] && wg_set_opts+=(private-key "$WGPK")
+[[ -n "$PublicKey" ]] && wg_set_opts+=(peer "$PublicKey")
+[[ -n "$PresharedKey" ]] && wg_set_opts+=(preshared-key "$PresharedKey")
+[[ -n "$Endpoint" ]] && wg_set_opts+=(endpoint "$Endpoint")
+[[ -n "$PersistentKeepalive" ]] && wg_set_opts+=(persistent-keepalive "$PersistentKeepalive")
+[[ "${#AllowedIPs[@]}" -gt 0 ]] && wg_set_opts+=(allowed-ips "$(IFS=, ; echo "${AllowedIPs[*]}")")
+
+if [[ "$1" == "up" ]]
+then
+	ip netns del "$WGDEV" &>/dev/null || true
+	ip netns add "$WGDEV"
+	ip -n "$WGDEV" link set lo up
+	ip link add dev "$WGDEV" type wireguard
+	ip link set "$WGDEV" netns "$WGDEV"
+	rm -f "$WGPK"
+	mkfifo -m 0600 "$WGPK"
+	echo "$PrivateKey" > "$WGPK" &
+	ip netns exec "$WGDEV" wg set "$WGDEV" "${wg_set_opts[@]}"
+	rm -f "$WGPK"
+	for a in "${Addresses[@]}" ; do ip -n "$WGDEV" addr add "$a" dev "$WGDEV" ; done
+	if [[ "${#DNS[@]}" -gt 0 ]]
+	then
+		mkdir -p "/etc/netns/$WGDEV"
+		truncate -s 0 "/etc/netns/$WGDEV/resolv.conf"
+		for d in "${DNS[@]}" ; do echo "nameserver $d" >> "/etc/netns/$WGDEV/resolv.conf" ; done
+		echo 'options edns0 single-request-reopen' >> "/etc/netns/$WGDEV/resolv.conf"
+	fi
+	[[ -n "$MTU" ]] && ip -n "$WGDEV" link set "$WGDEV" mtu "$MTU"
+	ip -n "$WGDEV" link set "$WGDEV" up
+	for a in "${AllowedIPs[@]}" ; do ip -n "$WGDEV" route add "$a" dev "$WGDEV" ; done
+elif [[ "$1" == "down" ]]
+then
+	ip netns del "$WGDEV" || true
+	rm -f "/etc/netns/$WGDEV/resolv.conf" || true
+	rmdir "/etc/netns/$WGDEV" || true
+elif [[ "$1" == "exec" ]]
+then
+	shift 2
+	exec sudo -E -- ip netns exec "$WGDEV" sudo -E -u "${SUDO_USER:-${USER}}" -- "$@"
+fi
+
+```
+
+```sh
+# Bring up wireguard conf in a network namespace of the same name
+sudo wg-netns up <path/to/wgconf>
+# Bring down network namespace
+sudo wg-netns down <path/to/wgconf>
+# Execute a command inside the network namespace
+wg-netns exec <path/to/wgconf> firefox
+# Join a network namespace using firejail
+firejail --noprofile --netns=<wgconfname> firejail
+```
+
+**I found a bug when using an ipv6 endpoint as soon as packets were sent, it would freeze the whole system and force a reboot after some time. Use an ipv4 endpoint for now. (last checked on kernel `5.13.0-valve10.3-1-neptune-02176-g5fe416c4acd8`)**
