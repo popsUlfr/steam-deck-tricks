@@ -22,6 +22,7 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [Create a SteamOS/Arch development root in your home folder](#create-a-steamosarch-development-root-in-your-home-folder)
 - [Use your smartphone as webcam via Droidcam](#use-your-smartphone-as-webcam-via-droidcam)
 - [Android via Waydroid](#android-via-waydroid)
+- [Convert the home partition to Btrfs](#convert-the-home-partition-to-btrfs)
 
 ---
 
@@ -809,3 +810,13 @@ waydroid show-full-ui
 At this point you should see the android home screen.
 
 ![](data/waydroid-android.png)
+
+## Convert the home partition to Btrfs
+
+Converting the `ext4` formatted `/home` partition to `btrfs` can bring many advantages like transparent compression, instant snapshotting, deduplication, efficient backups, etc...
+
+- https://gitlab.com/popsulfr/steamos-btrfs
+
+It also adds support to mount `btrfs` and `f2fs` formatted sd cards.
+
+I've been daily driving it, switching branches and updating the system frequently in order to write up the guides around the Steam Deck all without issues.
