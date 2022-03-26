@@ -39,6 +39,9 @@ To install system packages you'll need to make the rootfs read-write and set up 
 - `/srv`
 - (and a few specific ones in `/var`: `/var/cache/pacman`, `/var/lib/docker`, `/var/lib/flatpak`, `/var/lib/systemd/coredump`, `/var/log`, `/var/tmp`)
 
+Concerning the arch repos maintained by Valve, the package versions seem to be pinned to a fixed target which means the packages are not rolling as much as on pure arch (like `glibc` being at 2.33 instead of 2.35 in the normal arch repos).
+The ota updater of SteamOS is the one supposed to roll the whole system to a newer target safely. That's why in my guides about installing software through `pacman` I'm somewhat going against Arch's mantra about [Partial upgrades being unsupported](https://wiki.archlinux.org/title/System_maintenance#Partial_upgrades_are_unsupported) and invoking `pacman` with `-Sy` without `-u`. The `-y` is present to make sure the missing package databases are synced but having `-u` might potentially pull in upgrades for system libraries that should preferably be updated during an ota update. So the worst case scenario in this instance would be that the package you just installed does not work which is preferable to potentially going through a full upgrade leaving the system in a weird state. For "simple" packages (like ones that do not have many dependencies) this should be ok but more complex packages might need a full upgrade `-u` nonetheless.
+
 ```sh
 sudo steamos-readonly disable
 sudo pacman-key --init
