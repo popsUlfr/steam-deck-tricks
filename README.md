@@ -4,6 +4,7 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 
 ## Contents
 
+- [Install packages into the rootfs using pacman](#install-packages-into-the-rootfs-using-pacman)
 - [Easy SSH access to the Steam Deck](#easy-ssh-access-to-the-steam-deck)
   - [On the Steam Deck](#on-the-steam-deck)
   - [On your computer](#on-your-computer)
@@ -23,6 +24,28 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [Android via Waydroid](#android-via-waydroid)
 
 ---
+
+## Install packages into the rootfs using pacman
+
+To install system packages you'll need to make the rootfs read-write and set up the keyrings first.
+
+**Anything you install this way will disappear after a system update or branch change. (But it's easy enough to reinstall them)**
+
+**BUT**, files installed into specifc locations will remain because they are offloaded onto your `/home` partition or the separate `/var` partition:
+- `/etc`
+- `/opt`
+- `/root`
+- `/srv`
+- (and a few specific ones in `/var`: `/var/cache/pacman`, `/var/lib/docker`, `/var/lib/flatpak`, `/var/lib/systemd/coredump`, `/var/log`, `/var/tmp`)
+
+```sh
+sudo steamos-readonly disable
+sudo pacman-key --init
+sudo pacman-key --populate archlinux
+sudo pacman-key --populate holo
+sudo pacman -Sy <packagetoinstall>
+sudo steamos-readonly enable
+```
 
 ## Easy SSH access to the Steam Deck
 
