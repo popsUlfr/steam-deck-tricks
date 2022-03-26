@@ -133,6 +133,11 @@ Add non-steam game to Steam in Desktop mode, select konsole and add as launch op
 This should make it work correctly inside gamescope.
 For the controller layout make sure to select the **Web Browser** Template.
 
+If you get `LD_PRELOAD` logs or obnoxious `pid XXXX != XXXX, skipping destruction (fork without exec?)` lines between the commands you execute,  you can do the following:
+- In the `Target` of the `konsole` shortcut set: `env`
+- In the `Launch options` set: `-u LD_PRELOAD konsole --fullscreen --notransparency`
+- Enjoy a clean terminal!
+
 ## Encrypted Vaults with Plasma Vault and gocryptfs
 
 Plasma Vault is a handy way to quickly create and manage encrypted folder embedded into the desktop environment.
