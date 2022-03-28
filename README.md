@@ -23,6 +23,9 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [Use your smartphone as webcam via Droidcam](#use-your-smartphone-as-webcam-via-droidcam)
 - [Android via Waydroid](#android-via-waydroid)
 - [Convert the home partition to Btrfs](#convert-the-home-partition-to-btrfs)
+- [Gamescope fps limiter not working on flatpaks](#gamescope-fps-limiter-not-working-on-flatpaks)
+  - [Flatseal](#flatseal)
+  - [Bottles](#bottles)
 
 ---
 
@@ -828,3 +831,41 @@ Converting the `ext4` formatted `/home` partition to `btrfs` can bring many adva
 It also adds support to mount `btrfs` and `f2fs` formatted sd cards.
 
 I've been daily driving it, switching branches and updating the system frequently in order to write up the guides around the Steam Deck all without issues.
+
+## Gamescope fps limiter not working on flatpaks
+
+The gamescope integrated fps limiter might now work as expected on flatpak apps (yuzu, bottles...).
+
+Using `mangohud` and setting `vsync=0` (`FIFO_RELAXED_KHR`) seems to do the trick.
+
+Install the `mangohud` flatpak:
+
+```sh
+flatpak install org.freedesktop.Platform.VulkanLayer.MangoHud
+```
+
+## Flatseal
+
+With **flatseal** (install via Discover or `flatpak install com.github.tchx84.Flatseal`) you can set persistent environment variables.
+
+Select your flatpak in `flatseal` and under `Environment` set the following environment variables:
+
+```
+MANGOHUD=1
+MANGOHUD_CONFIG=no_display,vsync=0
+```
+
+![](data/flatseal-env.png)
+
+## Bottles
+
+If you are using [Bottles](https://usebottles.com/), you can set per bottle environment variables.
+
+Go into your `bottle` and under `Preferences > Environment variables` add the variables:
+
+```
+MANGOHUD=1
+MANGOHUD_CONFIG=no_display,vsync=0
+```
+
+![](data/bottles-env.png)
