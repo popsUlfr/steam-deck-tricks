@@ -822,6 +822,8 @@ At this point you should see the android home screen.
 
 ![](data/waydroid-android.png)
 
+**WARNING! Attempting to access the system settings currently freezes the Steam Deck and it eventually reboots.**
+
 ## Convert the home partition to Btrfs
 
 Converting the `ext4` formatted `/home` partition to `btrfs` can bring many advantages like transparent compression, instant snapshotting, deduplication, efficient backups, etc...
