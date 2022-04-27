@@ -21,6 +21,8 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [Wireguard](#wireguard)
 - [Create a SteamOS/Arch development root in your home folder](#create-a-steamosarch-development-root-in-your-home-folder)
 - [Use your smartphone as webcam via Droidcam](#use-your-smartphone-as-webcam-via-droidcam)
+  - [AppImage](#appimage)
+  - [Manually](#manually)
 - [Android via Waydroid](#android-via-waydroid)
 - [Convert the home partition to Btrfs](#convert-the-home-partition-to-btrfs)
 - [Gamescope fps limiter not working on flatpaks](#gamescope-fps-limiter-not-working-on-flatpaks)
@@ -630,6 +632,16 @@ You can use the camera of your smartphone as webcam using Droidcam if you don't 
 - https://github.com/dev47apps/droidcam
 - https://play.google.com/store/apps/details?id=com.dev47apps.droidcam
 - https://play.google.com/store/apps/details?id=com.dev47apps.droidcamx
+
+### AppImage
+
+I managed to create an AppImage for the Steam Deck for a very easy way to use DroidCam:
+
+- https://github.com/popsUlfr/droidcam-steam-deck-appimage/releases
+
+On first launch it might take a few seconds to start because of the `depmod` of the kernel module.
+
+### Manually
 
 **First follow [Create a SteamOS/Arch development root in your home folder](#create-a-steamosarch-development-root-in-your-home-folder) and set up a development ready rootfs.**
 
