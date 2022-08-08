@@ -548,6 +548,15 @@ mkdir -m 0555 -p "$myroot"/{sys,proc}
 
 Now we invoke `fakeroot` with the explicit `libfakeroot.so` library and `faked` binary locations and set up the keyrings (`"$myroot"/arch.fakeroot` will save the real file attributes):
 
+**Important Note:**
+
+If you see any errors like
+```
+could not change the root directory (Operation not permitted)
+error: command failed to execute correctly
+```
+do not worry, you can ignore them as they are expected during the pacman operations in the fakeroot environment.
+
 ```sh
 fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
 	--faked "$HOME/.local/bin/faked" \
