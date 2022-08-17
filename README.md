@@ -614,7 +614,7 @@ We set up an "unprivileged" user `deck` (the root user right now is already unpr
 
 ```sh
 useradd -m deck
-echo 'deck:x:1000:1000::/home/deck:/bin/bash` >> /etc/passwd
+echo 'deck:x:1000:1000::/home/deck:/bin/bash' >> /etc/passwd
 echo 'deck:*:14871::::::' >> /etc/shadow
 ```
 
@@ -777,7 +777,7 @@ sudo steamos-readonly enable
 
 Load the modules:
 ```sh
-xargs -a /usr/lib/modules-load.d/anbox.conf -n 1 sudo modprobe
+xargs -a /usr/lib/modules-load.d/anbox-modules.conf -n 1 sudo modprobe
 ```
 
 Offload the waydroid folder onto the home partition:
