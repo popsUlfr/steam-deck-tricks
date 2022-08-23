@@ -589,7 +589,7 @@ Note: If you see [`bwrap: execvp fakeroot: No such file or directory`](https://g
 #SigLevel = Never
 ```
 
-Once you have installed the `base` and `base-devel` groups, be sure to uncomment the lines once more.
+Once you have installed the `base` and `base-devel` groups, be sure to uncomment the 3 lines above to re-enable the `jupiter-beta` repository.
 
 Copy over `pacman.conf`, `mirrorlist` and `makepkg.conf`:
 
