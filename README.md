@@ -581,6 +581,16 @@ fakeroot --lib "$HOME/.local/lib/libfakeroot/libfakeroot.so" \
 	pacman --root "$myroot" --gpgdir "$myroot"/etc/pacman.d/gnupg -Sy --noconfirm base base-devel
 ```
 
+Note: If you see [`bwrap: execvp fakeroot: No such file or directory`](https://gitlab.com/popsulfr/steam-deck-tricks/-/issues/3) when attempting to run the above commands you may need to temporarily disable the `jupiter-beta` repository, which is currently not responding. You can do this by commenting out the following in `/etc/pacman.conf` as follows:
+
+```
+#[jupiter-beta]
+#Include = /etc/pacman.d/mirrorlist
+#SigLevel = Never
+```
+
+Once you have installed the `base` and `base-devel` groups, be sure to uncomment the lines once more.
+
 Copy over `pacman.conf`, `mirrorlist` and `makepkg.conf`:
 
 ```sh
