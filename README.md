@@ -551,7 +551,17 @@ ln -s podman-*.AppImage podman-remote
 ./podman-remote --url='ssh://root@localhost:22/run/podman/podman.sock' info
 ```
 
-Now to set up a SteamOS dev root:
+**The awesome people over at [SteamDeckHomebrew](https://github.com/SteamDeckHomebrew) have already prepared docker images with rust, go toolchains and an accurate SteamOS holo image: https://github.com/orgs/SteamDeckHomebrew/packages?repo_name=holo-docker**
+
+```sh
+./podman-*.AppImage
+(deck@podman-shell:~) $ podman pull ghcr.io/steamdeckhomebrew/holo-base:latest
+(deck@podman-shell:~) $ podman run -ti holo-base:latest /bin/bash
+(root@<id> /)#
+```
+With this you should be good to go with your development needs on the Steam Deck.
+
+**Here's a manual way to get SteamOS image using the archlinux image as base:**
 
 ```sh
 ./podman-*.AppImage
@@ -574,7 +584,7 @@ Now to set up a SteamOS dev root:
 This replaces all Arch packages with the SteamOS' mirror versions and installs development packages.
 Finally an unprivileged `deck` user is created.
 
-You can be come this user imediately with:
+You can be come this user immediately with:
 
 ```sh
 [root@<id> /]# su - deck
@@ -601,27 +611,27 @@ CONTAINER ID  IMAGE                                 COMMAND        CREATED      
 
 You can either use the `<id>` or the `<name>` to target a container. Now commit the container to a new image:
 ```sh
-podman commit -s <id> holo:latest
+(deck@podman-shell:~) $ podman commit -s <id> holo:latest
 ```
 
 This creates a new squashed image called `holo` with tag `latest` which you can see with `podman images`.
 
 Now you can run it like any image:
 ```sh
-podman run -ti holo:latest
+(deck@podman-shell:~) $ podman run -ti holo:latest
 ```
 Mount the current directory at `/tmp/out` in the image:
 ```sh
-podman run -v ./:/tmp/out -ti holo:latest
+(deck@podman-shell:~) $ podman run -v ./:/tmp/out -ti holo:latest
 ```
 Become immediately the `deck` user:
 ```sh
-podman run -v ./:/tmp/out -u deck -ti holo:latest
+(deck@podman-shell:~) $ podman run -v ./:/tmp/out -u deck -ti holo:latest
 ```
 
 You can also resume a stopped container at any moment without needing to commit a new image:
 ```sh
-podman start -ai <id>
+(deck@podman-shell:~) $ podman start -ai <id>
 ```
 
 ## Create a SteamOS/Arch development root in your home folder
