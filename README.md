@@ -19,6 +19,7 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [auto-cpufreq](#auto-cpufreq)
   - [Low performance in games on battery](#low-performance-in-games-on-battery)
 - [Wireguard](#wireguard)
+- [Use podman to create a SteamOS/Arch development image](#use-podman-to-create-a-steamosarch-development-image)
 - [Create a SteamOS/Arch development root in your home folder](#create-a-steamosarch-development-root-in-your-home-folder)
 - [Use your smartphone as webcam via Droidcam](#use-your-smartphone-as-webcam-via-droidcam)
   - [AppImage](#appimage)
@@ -509,8 +510,125 @@ firejail --noprofile --netns=<wgconfname> firejail
 
 **I found a bug when using an ipv6 endpoint as soon as packets were sent, it would freeze the whole system and force a reboot after some time. Use an ipv4 endpoint for now. (last checked on kernel `5.13.0-valve10.3-1-neptune-02176-g5fe416c4acd8`)**
 
+## Use podman to create a SteamOS/Arch development image
+
+You can get a portable AppImage of podman which works on SteamOS here: https://github.com/popsUlfr/podman-appimage/releases
+
+It should make getting a development root much easier and robust and you can then make use of all the existing container images out there to get all sorts of software running.
+
+Once you downloaded the `podman-*.AppImage` there are various ways to launch it:
+
+### **A.**
+
+* In **Dolphin**
+* Right-click the **AppImage** > **Properties** > **Permissions** > Check **Is executable** > Click **OK**
+* Right-click the **AppImage** > **Run In Konsole**
+
+### **B.**
+
+* Open **Konsole**
+* Navigate (`cd`) to the folder where the **AppImage** is stored
+* `chmod +x podman-*.AppImage`
+* `./podman-*.AppImage`
+
+### **C.**
+
+* In **Dolphin**
+* Right-click the folder where the **AppImage** is stored > **Open Terminal** / or hit **Shift+F4**
+* `chmod +x podman-*.AppImage`
+* `./podman-*.AppImage`
+
+It will most likely prompt you to fix some things to get the rootless mode working, so make sure you set your user up with a password using `passwd` beforehand.
+
+It will open a `podman-shell` that gives you access to the various **podman** commands, see: https://docs.podman.io/en/latest/Commands.html
+
+You can also rename the **AppImage** or create a symlink to access a contained binary directly:
+
+```sh
+ln -s podman-*.AppImage podman
+./podman info
+ln -s podman-*.AppImage podman-remote
+./podman-remote --url='ssh://root@localhost:22/run/podman/podman.sock' info
+```
+
+Now to set up a SteamOS dev root:
+
+```sh
+./podman-*.AppImage
+(deck@podman-shell:~) $ podman pull archlinux:latest
+(deck@podman-shell:~) $ podman run -ti archlinux:latest
+[root@<id> /]# echo 'Server = https://steamdeck-packages.steamos.cloud/archlinux-mirror/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+[root@<id> /]# sed -i 's|^\(\[core\]\)|[jupiter]\nInclude = /etc/pacman.d/mirrorlist\nSigLevel = Never\n\n[holo]\nInclude = /etc/pacman.d/mirrorlist\nSigLevel = Never\n\n\1|' /etc/pacman.conf
+[root@<id> /]# pacman -Syy
+[root@<id> /]# pacman-key --init
+[root@<id> /]# pacman-key --populate archlinux
+[root@<id> /]# pacman -S holo-keyring
+[root@<id> /]# pacman -Rdd --noconfirm libverto
+[root@<id> /]# pacman -Qqn | pacman -S --noconfirm --overwrite='*' -
+[root@<id> /]# pacman -S --noconfirm --needed base-devel git sudo
+[root@<id> /]# rm -rf /var/cache/pacman/pkg/*
+[root@<id> /]# useradd -m deck
+[root@<id> /]# echo 'deck ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/deck
+```
+
+This replaces all Arch packages with the SteamOS' mirror versions and installs development packages.
+Finally an unprivileged `deck` user is created.
+
+You can be come this user imediately with:
+
+```sh
+[root@<id> /]# su - deck
+[deck@<id> /]$
+```
+
+And `sudo` is set up to do tasks as root.
+
+You can exit the container:
+```sh
+[root@<id> /]# exit
+```
+
+Now create a new image from this container:
+
+Query the container id with:
+```sh
+(deck@podman-shell:~) $ podman ps -a
+```
+```
+CONTAINER ID  IMAGE                                 COMMAND        CREATED         STATUS                    PORTS       NAMES
+<id>          docker.io/archlinux/archlinux:latest  /usr/bin/bash  29 minutes ago  Exited (0) 2 minutes ago              <name>
+```
+
+You can either use the `<id>` or the `<name>` to target a container. Now commit the container to a new image:
+```sh
+podman commit -s <id> holo:latest
+```
+
+This creates a new squashed image called `holo` with tag `latest` which you can see with `podman images`.
+
+Now you can run it like any image:
+```sh
+podman run -ti holo:latest
+```
+Mount the current directory at `/tmp/out` in the image:
+```sh
+podman run -v ./:/tmp/out -ti holo:latest
+```
+Become immediately the `deck` user:
+```sh
+podman run -v ./:/tmp/out -u deck -ti holo:latest
+```
+
+You can also resume a stopped container at any moment without needing to commit a new image:
+```sh
+podman start -ai <id>
+```
 
 ## Create a SteamOS/Arch development root in your home folder
+
+**DISCLAIMER: the following section describes the hard manual way to get a fake root.**
+
+**Check out [Use podman to create a SteamOS/Arch development image](#use-podman-to-create-a-steamosarch-development-image) instead for an easier and more flexible solution using podman.**
 
 To install software beyond flatpaks, AppImages like system packages it is practical to create a custom rootfs to build new software.
 
