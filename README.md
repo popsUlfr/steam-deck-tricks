@@ -29,6 +29,7 @@ I'm compiling here Steam Deck quality of life improvements and tricks that will 
 - [Gamescope fps limiter not working on flatpaks](#gamescope-fps-limiter-not-working-on-flatpaks)
   - [Flatseal](#flatseal)
   - [Bottles](#bottles)
+- [Toggle internal display via hotkeys](#toggle-internal-display-via-hotkeys)
 
 ---
 
@@ -1026,3 +1027,35 @@ MANGOHUD_CONFIG=no_display,vsync=0
 ```
 
 ![](data/bottles-env.png)
+
+
+## Toggle internal display via hotkeys
+
+Sometimes it is useful to be able to quickly toggle the internal display in desktop mode. You can use the following script to toggle the Steam Deck's display:
+
+```bash
+#!/bin/bash
+
+# Count of lines returned by xrandr --listactivemonitors
+active=$(xrandr --listactivemonitors | grep -w 'eDP' -c)
+# Screen resolution
+resolution=800x1280
+# Position relative to your external monitor(s)
+# KDEs display settings can be used to get the correct position
+position=626x1440
+# Refresh rate
+refreshrate=60
+
+if (($active == 1)); then
+    echo "Turning OFF internal monitor!"
+    xrandr --output eDP --off
+else
+    echo "Turning ON internal monitor!"
+    xrandr --output eDP --mode $resolution --rate $refreshrate --pos $position --rotate right
+fi
+```
+Make sure to set the position to match your screen setup.
+
+To define a shortcut open System Settings and navigate to the "Shortcuts" section as seen on the screenshot below. Set the action and the trigger and you're good to go.
+
+![](data/toggle-screen-hotkey.png)
